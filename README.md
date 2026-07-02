@@ -6,7 +6,7 @@ A production-grade C++ web application for generating, managing, and printing st
 
 | | |
 |---|---|---|
-| **Course** | CSC 226 — Object-Oriented Programming II |
+| **Course** | CSC 226 — Object-Oriented Programming I |
 | **Group** | 6 — 20 Members |
 | **Tech** | C++17, Winsock2 (custom HTTP server), Embedded HTML/CSS/JS |
 | **Patterns** | Strategy, Template Method, Factory, Inheritance, Polymorphism, RAII |

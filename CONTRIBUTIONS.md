@@ -1,7 +1,7 @@
 # CONTRIBUTIONS
 
 ## LASU Certificate Generator v2.0
-**CSC 226 — Object-Oriented Programming II**  
+**CSC 226 — Object-Oriented Programming I**  
 **Lagos State University — Department of Computer Science**  
 **Group 6**
 
