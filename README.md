@@ -114,6 +114,8 @@ Browser → HTTP (JSON fetch) → HttpServer → CertificateGenerator → Certif
 
 ## Quick Start
 
+**Watch the video tutorial:** [https://youtu.be/UiwG0zCYKG8](https://youtu.be/UiwG0zCYKG8)
+
 ### Build
 ```bash
 g++ -std=c++17 -I include -o certificate_generator.exe main.cpp src/*.cpp -lws2_32
