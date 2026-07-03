@@ -1,0 +1,616 @@
+================================================================================
+LASU CERTIFICATE GENERATOR — INTERVIEW / VIVA QUESTIONS & ANSWERS
+CSC 226 — Object-Oriented Programming I — Group 6
+================================================================================
+
+================================================================================
+Q1: Your presentation says "7 pure virtual methods." Count them explicitly.
+    Where is the 7th?
+================================================================================
+
+ANSWER:
+The presentation and README are incorrect. There are 6 pure virtual methods:
+  1. Person::getDescription()          — include/person.hpp:20
+  2. CertificateTemplate::header()     — include/certificate.hpp:23
+  3. CertificateTemplate::styles()     — include/certificate.hpp:24
+  4. CertificateTemplate::body()       — include/certificate.hpp:25-26
+  5. Certificate::getTypeName()        — include/certificate.hpp:76
+  6. Certificate::getDescriptor()      — include/certificate.hpp:77
+
+The claim of "7" in the presentation-readme.md (line 78) and CONTRIBUTIONS.md
+(line 37) should be corrected to 6.
+
+NOTE: generateHTML() is virtual but NOT pure virtual — it has a concrete
+implementation in the base class (certificate.cpp:241), which is what makes it
+a Template Method pattern rather than a pure abstract method.
+
+
+================================================================================
+Q2: You call Certificate::generateHTML() a "Template Method," but it's not
+    pure virtual. How is that different from just a regular virtual function?
+    What makes it a Template Method specifically?
+================================================================================
+
+ANSWER:
+A Template Method is a virtual function in the BASE class that defines a fixed
+algorithm skeleton — calling sub-steps in a specific order that subclasses
+CANNOT change.
+
+In certificate.cpp:241-250, generateHTML() does this:
+
+    string Certificate::generateHTML() const {
+        string typeName = getTypeName();    // Step 1: call pure virtual
+        string date = getCurrentDate();     // Step 2: get date
+        string html;
+        html += template_->header(typeName);  // Step 3: delegate to strategy
+        html += template_->styles();          // Step 4: delegate to strategy
+        html += template_->body(student_, typeName, date);  // Step 5: strategy
+        html += "</body>\n</html>";
+        return html;
+    }
+
+The key distinction:
+  - A regular virtual function lets subclasses REPLACE the entire behavior.
+  - A Template Method lets subclasses only FILL IN SPECIFIC STEPS while the
+    base class controls the overall flow.
+
+Subclasses like CertificateOfExcellence only override getTypeName() to return
+"Excellence" — they don't change the order of header()->styles()->body().
+That control belongs to the base class. This is the hallmark of Template Method.
+
+Combined with the Strategy pattern (CertificateTemplate), we get two levels:
+  - Template Method controls the CONTENT flow (which type name goes where)
+  - Strategy controls the VISUAL variation (Formal vs Modern vs Minimalist)
+
+
+================================================================================
+Q3: Person has getDescription() as pure virtual, but Student is the only
+    subclass. Why not just make Person concrete? What flexibility does the
+    abstract base give you?
+================================================================================
+
+ANSWER:
+Three reasons:
+
+1. SEMANTIC: A Person is a concept — you can't describe a generic Person.
+   Every Person MUST be something specific (Student, Teacher, Staff). Making
+   Person abstract enforces this at compile time. You cannot instantiate
+   Person("John") — the compiler rejects it.
+
+2. POLYMORPHISM: If we later add Teacher or Staff subclasses, the system
+   already works with base class pointers:
+       vector<Person*> people;
+       people.push_back(new Student(...));
+       people.push_back(new Teacher(...));  // future
+       for (auto p : people) p->getDescription();  // works
+
+3. OOP DEMONSTRATION: This is a CSC 226 project specifically designed to
+   demonstrate inheritance and abstract base classes. The Person -> Student
+   hierarchy is the clearest example of "is-a" relationship.
+
+That said, in a production system with only one subclass, you could argue
+Person is over-engineered. The honest answer for a viva is: "It demonstrates
+the concept and leaves room for extension."
+
+
+================================================================================
+Q4: gradeToPoints() returns discrete values (5.0, 4.0, etc.) even for numeric
+    scores. A student who scores 71 gets the same 5.0 as someone who scores
+    100. Doesn't this lose precision?
+================================================================================
+
+ANSWER:
+Yes, it does lose precision — but this is intentional. LASU uses the 5.0 CGPA
+scale with fixed grade boundaries:
+
+  A = 5.0 (70-100%)  — First Class Honours
+  B = 4.0 (60-69.9%) — Second Class Upper
+  C = 3.0 (50-59.9%) — Second Class Lower
+  D = 2.0 (45-49.9%) — Third Class Honours
+  E = 1.0 (40-44.9%) — Pass
+  F = 0.0 (0-39.9%)  — Fail
+
+This is how LASU officially converts grades to CGPA for transcripts and
+graduation classification. A score of 71 and 100 both yield First Class (5.0)
+because that's the institution's grading policy.
+
+If we wanted finer precision, we could use a linear scale (score / 20), but
+that would not match LASU's official system. We chose institutional accuracy
+over mathematical precision.
+
+For the average GPA calculation, this means the average reflects the
+DISTRIBUTION of grade categories, not the raw score average. This is standard
+practice at Nigerian universities.
+
+
+================================================================================
+Q5: The GRADE_POINTS map only has A-F. What about B+, A-, C+? Where are
+    plus/minus grades handled? What does gradeToPoints() return for "B+"?
+================================================================================
+
+ANSWER:
+LASU's grading system does not use plus/minus grades. The official scale uses
+only flat letter grades: A, B, C, D, E, F. This is stated in the README and
+the embedded UI's CSV help modal.
+
+If someone enters "B+" anyway:
+  - isValidGrade() checks GRADE_POINTS.count("B+") — returns 0 (not found)
+  - Then tries std::stod("B+") — throws exception, caught, returns false
+  - So "B+" is rejected as invalid by the validator
+
+gradeToPoints() for "B+" would:
+  - GRADE_POINTS.find("B+") — not found
+  - std::stod("B+") — throws, caught, returns 0.0
+
+This is correct behavior: B+ is not a valid LASU grade, so it's rejected
+at the validation layer before it ever reaches gradeToPoints(). The validator
+in addStudent() (generator.cpp:26) catches this and throws ValidationException.
+
+If we wanted to support plus/minus grades, we would add entries like:
+    {"B+", 4.5}, {"B-", 3.5}, {"A-", 4.5}
+But this is not part of LASU's system.
+
+
+================================================================================
+Q6: findStudent() returns a raw pointer to an element inside std::map. If
+    another thread calls removeStudent() while the caller is using that
+    pointer, you get a dangling reference. How do you address this?
+================================================================================
+
+ANSWER:
+This is a real bug. The mutex in findStudent() only protects the map lookup —
+once the lock is released, the returned pointer has no protection. If another
+thread removes that student, the pointer dinks.
+
+Current code (generator.cpp:38-42):
+    Student* CertificateGenerator::findStudent(const string& name) {
+        lock_guard<mutex> lock(mutex_);
+        auto it = students_.find(toLower(name));
+        return (it != students_.end()) ? &it->second : nullptr;
+        // mutex released here — pointer is now unprotected
+    }
+
+Possible fixes:
+  1. Return a copy (Student) instead of a pointer — safest but uses more memory
+  2. Return a shared_ptr<Student> — caller shares ownership
+  3. Hold the lock for the duration of use — but the API doesn't support this
+  4. Document that the pointer is only valid until the next mutating operation
+
+For a single-user desktop application, this is acceptable in practice because:
+  - The browser sends one request at a time
+  - The server processes requests sequentially per thread
+  - There's no realistic scenario where removeStudent() runs while someone
+    is using the pointer from findStudent()
+
+But it's a real concurrency issue in a multi-threaded context. Best answer
+for a viva: "We acknowledge this limitation. In production, we'd return a
+copy or use shared_ptr."
+
+
+================================================================================
+Q7: generateCertificateFor() and generateAllCertificates() acquire the mutex
+    and then do file I/O while holding it. Is this a good use of the lock?
+================================================================================
+
+ANSWER:
+Not ideal. The current code holds the mutex during:
+  1. Map lookup
+  2. Template creation
+  3. Certificate generation
+  4. File system creation (create_directories)
+  5. File writing (ofstream)
+
+File I/O can be slow. If the disk is busy, every other request blocks.
+
+Better approach:
+    bool CertificateGenerator::generateCertificateFor(...) const {
+        Student s;
+        {
+            lock_guard<mutex> lock(mutex_);
+            auto it = students_.find(toLower(name));
+            if (it == students_.end()) return false;
+            s = it->second;  // COPY the student data
+        }
+        // Lock released — now do file I/O without holding the mutex
+        auto tmpl = makeTemplate(style);
+        auto cert = makeCertificate(type, s, std::move(tmpl));
+        // ... write file ...
+    }
+
+This copies the student data under the lock, then releases it before doing
+the expensive I/O work. For a single-user app this doesn't matter much, but
+it's the correct pattern for production code.
+
+
+================================================================================
+Q8: You detach threads in the accept loop. What happens to those threads
+    when the server shuts down?
+================================================================================
+
+ANSWER:
+When the process is terminated (Ctrl+C), all threads are forcefully killed
+by the OS. There is no graceful cleanup.
+
+The current code (http_server.cpp:1184-1189):
+    while (true) {
+        SOCKET client = accept(server, nullptr, nullptr);
+        if (client == INVALID_SOCKET) break;
+        std::thread(handleClient, client, std::ref(gen_), verbose_).detach();
+    }
+
+Problems with detach():
+  - No way to join threads — we lose track of them
+  - If a thread is mid-operation when the process exits, data could be
+    left in an inconsistent state
+  - Detached threads may outlive the server object
+
+Better approach for graceful shutdown:
+  - Store threads in a vector<thread>
+  - On shutdown, close the server socket (makes accept() fail)
+  - Join all threads before exiting
+  - Set a flag that handleClient checks periodically
+
+For a viva: "We use detach() for simplicity. In production, we'd store
+threads and join them on shutdown for graceful cleanup."
+
+
+================================================================================
+Q9: Certificate holds a const Student& reference. If the student is removed
+    from the map while the certificate is alive, that reference dangles.
+    Why not store a copy?
+================================================================================
+
+ANSWER:
+This is a real bug. In certificate.hpp:66:
+    class Certificate {
+    protected:
+        const Student& student_;  // DANGEROUS: reference to map element
+        unique_ptr<CertificateTemplate> template_;
+    };
+
+If a student is removed from the map while a Certificate object holds a
+reference to them, the reference points to freed memory — undefined behavior.
+
+The fix is simple: change the reference to a value:
+    const Student student_;  // Safe: owns a copy
+
+Why did we use a reference? Likely to avoid copying. But Student objects are
+small (three strings), so copying is cheap and safe.
+
+In practice, this bug is unlikely to trigger because:
+  1. Certificates are created and written to files immediately
+  2. The Certificate object goes out of scope quickly
+  3. Nobody removes students while generating certificates
+
+But it's still wrong in principle. For a viva: "We should store a copy
+instead of a reference. The reference was chosen to avoid copying, but
+Student objects are small enough that copying is safer."
+
+
+================================================================================
+Q10: The entire HTML/CSS/JS frontend is a ~700-line raw string literal in
+     http_server.cpp. What are the tradeoffs versus serving a separate file?
+================================================================================
+
+ANSWER:
+Advantages of embedding:
+  - Single binary: no need to distribute HTML/CSS/JS files alongside the exe
+  - Easy compilation: g++ one command, get one .exe
+  - Tight coupling: frontend and backend are compiled together, so API
+    changes are immediately reflected
+  - No file path issues: no need to figure out where to serve static files from
+
+Disadvantages:
+  - Hard to edit: changing CSS means recompiling C++
+  - No syntax highlighting in the C++ file for the embedded HTML
+  - Large string literal makes the C++ source file harder to read
+  - No browser dev tools for debugging the embedded frontend
+  - No hot reload during development
+
+For a viva: "We embedded the frontend for simplicity and single-binary
+deployment. In a larger project, we'd serve static files separately and
+use a proper frontend build pipeline."
+
+This is a reasonable tradeoff for a university project where ease of
+compilation and distribution matters more than developer experience.
+
+
+================================================================================
+Q11: loadFromCsv() uses a heuristic to detect headers. What if someone has
+     a CSV where the first data row looks like a valid grade?
+================================================================================
+
+ANSWER:
+The heuristic (generator.cpp:180-187) tries to parse the first line as a
+data row. If the third column passes isValidGrade(), it's treated as data.
+
+Edge cases:
+  1. Header "Name,Course,Grade" — "Grade" fails isValidGrade() → treated
+     as header → skipped correctly
+  2. Data "Alice,CSC 226,A" — "A" passes → treated as data → correct
+  3. Ambiguous "Bob,CSC,5" — "5" passes (numeric 0-100) → treated as data
+     → correct
+
+The only failure case: a header row where the third column happens to be
+a valid grade. Example:
+    Name,Course,Score
+    Alice,CSC 226,A
+
+Here "Score" fails isValidGrade(), so it's correctly treated as a header.
+
+But if someone wrote:
+    Name,Course,A
+    Alice,CSC 226,B
+
+The "A" in the header row passes validation, so the header is treated as
+data and "Name" becomes the student name, "Course" becomes the course,
+"A" becomes the grade. This creates a garbage record.
+
+Mitigation: The garbage record would have name="Name" which is clearly
+wrong. A better approach would be to check if the first column matches
+common header patterns (Name, Student, etc.).
+
+
+================================================================================
+Q12: The /output/ route takes a path from the URL and opens a file. What
+     prevents path traversal attacks like GET /output/../../etc/passwd?
+================================================================================
+
+ANSWER:
+There is NO path traversal protection. This is a security vulnerability.
+
+In http_server.cpp:1099-1108:
+    else if (method == "GET" && path.find("/output/") == 0) {
+        string filepath = path.substr(1);  // "output/../../etc/passwd"
+        ifstream file(filepath);           // opens arbitrary file!
+        // ...
+    }
+
+A malicious request could read any file the process has access to.
+
+The fix is to validate the resolved path:
+    else if (method == "GET" && path.find("/output/") == 0) {
+        string filepath = path.substr(1);
+        // Resolve to absolute path and verify it's inside output/
+        auto absPath = filesystem::weakly_canonical(filepath);
+        auto outputDir = filesystem::weakly_canonical("output");
+        if (absPath.string().find(outputDir.string()) != 0) {
+            sendJSON(403, R"({"status":"error","message":"Access denied"})");
+            return;
+        }
+        ifstream file(filepath);
+        // ...
+    }
+
+For a viva: "We acknowledge this is a vulnerability. In production, we'd
+validate that the resolved path stays within the output/ directory. Since
+this is a localhost-only application, the risk is limited, but it should
+still be fixed."
+
+
+================================================================================
+Q13: /loadcontent writes user input to .tmp_upload.csv then deletes it. What
+     if two requests come in simultaneously?
+================================================================================
+
+ANSWER:
+Race condition. Two concurrent requests would both write to the same temp
+file, corrupting each other's data.
+
+In http_server.cpp:1036-1054:
+    string csvPath = ".tmp_upload.csv";
+    ofstream tmp(csvPath);
+    tmp << fields["content"];  // Thread A writes here
+    tmp.close();
+    // Thread B could overwrite this file before Thread A reads it
+    gen.loadFromCsv(csvPath);
+
+Fix options:
+  1. Use unique temp filenames: auto path = ".tmp_" + to_string(time(nullptr))
+  2. Use a mutex around the entire loadcontent handler
+  3. Parse CSV content directly from the string instead of writing to a file
+
+The best fix is option 3: modify loadFromCsv() to accept a string stream
+instead of a filename, eliminating the temp file entirely.
+
+For a viva: "This is a race condition. Two simultaneous uploads would
+overwrite the same temp file. We'd fix this by using unique filenames
+or parsing the CSV string directly in memory."
+
+
+================================================================================
+Q14: What happens if you generate a certificate for a student whose name
+     contains HTML special characters like <, >, ", or &?
+================================================================================
+
+ANSWER:
+The name is inserted directly into HTML without escaping. In certificate.cpp:97:
+
+    b << "  <div class=\"name\">" << student.getName() << "</div>\n";
+
+If a student is named "O'Brien <script>alert('xss')</script>", the output
+HTML would contain raw script tags — a potential XSS vulnerability if the
+certificate HTML is opened in a browser.
+
+However, in this application:
+  1. The certificates are generated locally by the user
+  2. The user inputs their own data
+  3. There's no external attacker who can inject malicious names
+  4. The certificates are static HTML files, not served from a database
+
+So XSS is not a realistic attack vector here. But for correctness, we
+should escape HTML in the name, course, and grade fields.
+
+Fix:
+    static string htmlEscape(const string& s) {
+        string out;
+        for (char c : s) {
+            if (c == '<') out += "&lt;";
+            else if (c == '>') out += "&gt;";
+            else if (c == '&') out += "&amp;";
+            else if (c == '"') out += "&quot;";
+            else out += c;
+        }
+        return out;
+    }
+
+Then: << htmlEscape(student.getName()) <<
+
+For a viva: "Names are inserted raw into HTML. Since the user controls
+their own data and certificates are local files, this isn't a security
+risk in practice. But we should escape HTML for correctness."
+
+
+================================================================================
+Q15: Sort functions extract pointers, sort them, then rebuild the map. Since
+     std::map is sorted by key, what's the point of sorting by grade?
+================================================================================
+
+ANSWER:
+The sort functions DO work — but the effect is temporary.
+
+In generator.cpp:104-121 (sortByName example):
+    void CertificateGenerator::sortByName() {
+        lock_guard<mutex> lock(mutex_);
+        vector<Student*> ptrs;
+        for (auto& [name, student] : students_)
+            ptrs.push_back(&student);
+        sort(ptrs.begin(), ptrs.end(),
+             [](const Student* a, const Student* b) {
+                 return toLower(a->getName()) < toLower(b->getName());
+             });
+        map<string, Student> sorted;
+        for (Student* p : ptrs)
+            sorted[toLower(p->getName())] = *p;
+        students_ = std::move(sorted);
+    }
+
+The problem: std::map orders elements by key (lowercased name). When we
+rebuild the map, it re-sorts by key. The grade sort is lost.
+
+What actually happens:
+  1. sortByName() — sorts pointers by name → rebuilds map → map is in
+     alphabetical order (which it already was)
+  2. sortByGrade() — sorts pointers by grade → rebuilds map → map is
+     back in alphabetical order
+
+The sort is effectively a no-op for map iteration order.
+
+Better design:
+  - Use std::vector<Student> instead of std::map for storage
+  - Or maintain a separate sorted index
+  - Or sort the vector returned by getAllStudents() instead of the internal map
+
+For a viva: "You're right — sorting into a map keyed by name loses the
+custom sort order. This is a design flaw. We should use a vector for
+storage if we want to preserve arbitrary sort orders, or sort the
+output of getAllStudents() instead."
+
+
+================================================================================
+Q16: You built a full HTTP server in C++ for a single-user desktop tool.
+     Why not Python + Flask in 20 lines?
+================================================================================
+
+ANSWER:
+Three reasons, two academic and one technical:
+
+1. ASSIGNMENT REQUIREMENT: CSC 226 is Object-Oriented Programming I. The
+   project must demonstrate OOP concepts in C++. Using Python would not
+   satisfy the course requirements.
+
+2. OOP DEMONSTRATION: Building our own HTTP server gave us MORE opportunities
+   to demonstrate patterns than a framework would have:
+   - Strategy pattern (CertificateTemplate)
+   - Template Method (generateHTML)
+   - Factory (makeTemplate, makeCertificate)
+   - Inheritance (Person -> Student)
+   - Polymorphism (3 abstract base classes)
+   - RAII (lock_guard, unique_ptr, ofstream)
+   - Encapsulation (private data with validated access)
+   - Multithreading (std::thread, std::mutex)
+   - Exception handling (ValidationException, FileException)
+
+3. TECHNICAL: A C++ binary has no runtime dependencies. Python requires
+   Python installed, Flask installed, and path configuration. Our .exe
+   runs on any Windows machine with zero setup.
+
+4. EDUCATIONAL VALUE: We learned more by implementing the HTTP layer
+   ourselves than by calling app.get() in Flask. Understanding TCP sockets,
+   HTTP parsing, and thread-per-connection models is valuable knowledge.
+
+The honest tradeoff: development time is much higher in C++. Flask would
+take hours; this took weeks. But the learning outcome is significantly
+greater.
+
+
+================================================================================
+Q17: If I asked you to add PDF export, database persistence, and user
+     authentication — which patterns would you change or add, and which
+     existing patterns would still apply?
+================================================================================
+
+ANSWER:
+
+EXISTING PATTERNS THAT STILL APPLY:
+  - Strategy: add a new PdfExporter strategy alongside HtmlExporter
+  - Template Method: generatePDF() would follow the same skeleton
+  - Factory: extend makeCertificate() to return PDF or HTML
+  - Composition: Certificate has-a Exporter (new composition)
+  - Encapsulation: database and auth layers would use private data
+  - RAII: database connections, file handles auto-managed
+
+PATTERNS TO ADD:
+  1. REPOSITORY PATTERN — abstract database access behind an interface
+     (StudentRepository) so we can swap SQLite for PostgreSQL
+
+  2. DECORATOR PATTERN — wrap Certificate with authentication checks:
+     AuthenticatedCertificate checks permissions before generateHTML()
+
+  3. OBSERVER PATTERN — notify UI when data changes (certificate generated,
+     student added) instead of polling
+
+  4. BUILDER PATTERN — complex certificate construction with many optional
+     parameters (watermark, QR code, signature image, custom colors)
+
+  5. SINGLETON or DEPENDENCY INJECTION — single database connection shared
+     across the application
+
+CHANGES TO EXISTING CODE:
+  - CertificateTemplate: add virtual string pdfHeader() for PDF generation
+  - CertificateGenerator: replace std::map with database-backed storage
+  - HttpServer: add authentication middleware (check session/token before
+    routing to handlers)
+  - Student: add password hash field for authentication
+  - Factory: add CertificateType::Pdf variant or separate PdfCertificate
+
+EXAMPLE:
+    // Strategy: new exporter
+    class PdfExporter : public Exporter {
+        string export(const Certificate& cert) override;
+    };
+
+    // Repository: abstract database
+    class StudentRepository {
+        virtual void save(const Student& s) = 0;
+        virtual Student findById(int id) = 0;
+    };
+
+    // Decorator: authentication
+    class AuthenticatedCertificate : public Certificate {
+        Certificate& inner_;
+        Session& session_;
+        string generateHTML() const override {
+            if (!session_.isAdmin()) throw AuthException("Denied");
+            return inner_.generateHTML();
+        }
+    };
+
+The core OOP architecture (Strategy, Template Method, Factory, Composition)
+scales well to these new features. The main work would be adding Repository
+and Auth layers.
+
+
+================================================================================
+END OF INTERVIEW QUESTIONS
+================================================================================

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LASU Certificate Generator — Thumbnail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1817;
+    --bg-card: #2a2522;
+    --border: #3a3532;
+    --text: #faf9f5;
+    --text-muted: #b0aea5;
+    --text-dim: #6a6a65;
+    --accent: #d97757;
+    --accent-dim: rgba(217,119,87,0.15);
+    --blue: #6a9bcc;
+    --green: #788c5d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #0c0b0a;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  .thumbnail {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 120px;
+  }
+
+  /* Subtle grid pattern */
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  /* Gradient overlay */
+  .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 30%, rgba(217,119,87,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(106,155,204,0.04) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* Top accent line */
+  .top-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--blue) 50%, var(--green) 100%);
+    pointer-events: none;
+  }
+
+  /* Corner accent */
+  .corner-accent {
+    position: absolute;
+    pointer-events: none;
+  }
+  .corner-accent.tl { top: 40px; left: 40px; }
+  .corner-accent.tr { top: 40px; right: 40px; }
+  .corner-accent.bl { bottom: 40px; left: 40px; }
+  .corner-accent.br { bottom: 40px; right: 40px; }
+  .corner-accent svg { width: 60px; height: 60px; }
+
+  /* Decorative rings */
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    pointer-events: none;
+  }
+  .ring-1 { top: -120px; right: -80px; width: 500px; height: 500px; }
+  .ring-2 { bottom: -60px; left: -60px; width: 350px; height: 350px; }
+
+  .content { position: relative; z-index: 10; max-width: 900px; }
+
+  .logo {
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    overflow: hidden;
+    background: var(--bg-card);
+    padding: 8px;
+    animation: fadeSlideUp 0.8s ease-out forwards;
+    opacity: 0;
+  }
+  .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .pre-title {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    animation: fadeSlideUp 0.8s ease-out 0.15s forwards;
+    opacity: 0;
+  }
+  .pre-title span { color: var(--accent); }
+
+  .title {
+    font-size: 80px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin-bottom: 6px;
+    animation: fadeSlideUp 0.8s ease-out 0.3s forwards;
+    opacity: 0;
+  }
+  .title .accent { color: var(--accent); }
+
+  .subtitle-line {
+    font-size: 32px;
+    font-weight: 300;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    margin-bottom: 40px;
+    animation: fadeSlideUp 0.8s ease-out 0.45s forwards;
+    opacity: 0;
+  }
+
+  /* Category badges */
+  .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+    animation: fadeSlideUp 0.8s ease-out 0.6s forwards;
+    opacity: 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    border: 1px solid;
+    background: transparent;
+  }
+  .badge-accent { color: var(--accent); border-color: var(--accent); }
+  .badge-blue { color: var(--blue); border-color: var(--blue); }
+  .badge-green { color: var(--green); border-color: var(--green); }
+  .badge-white { color: var(--text); border-color: var(--border); }
+  .badge-muted { color: var(--text-muted); border-color: var(--border); }
+
+  /* Feature cards */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+    animation: fadeSlideUp 0.8s ease-out 0.75s forwards;
+    opacity: 0;
+    max-width: 780px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .feature-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .feature-card .icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+  .feature-card h4 {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .feature-card p {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  /* Bottom tech bar */
+  .tech-bar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    animation: fadeSlideUp 0.8s ease-out 0.9s forwards;
+    opacity: 0;
+  }
+  .tech-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  /* Bottom bar */
+  .bottom-bar {
+    position: absolute;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    animation: fadeSlideUp 0.8s ease-out 1.05s forwards;
+    opacity: 0;
+  }
+  .bottom-bar span {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .bottom-bar .sep {
+    width: 16px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  @keyframes fadeSlideUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 1920px) {
+    .thumbnail { transform: scale(calc(100vw / 1920)); transform-origin: top left; }
+    body { overflow: auto; }
+  }
+</style>
+</head>
+<body>
+  <div class="thumbnail">
+    <div class="grid-bg"></div>
+    <div class="gradient-overlay"></div>
+    <div class="top-line"></div>
+
+    <!-- Corner accents -->
+    <div class="corner-accent tl">
+      <svg viewBox="0 0 60 60" fill="none">
+        <path d="M4 56 L4 4 L56 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        <rect x="6" y="6" width="20" height="1" fill="var(--accent)" opacity="0.3"/>
+        <rect x="6" y="6" width="1" height="20" fill="var(--accent)" opacity="0.3"/>
+      </svg>
+    </div>
+    <div class="corner-accent tr">
+      <svg viewBox="0 0 60 60" fill="none">
+        <path d="M4 56 L4 4 L56 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        <rect x="34" y="6" width="20" height="1" fill="var(--accent)" opacity="0.3"/>
+        <rect x="53" y="6" width="1" height="20" fill="var(--accent)" opacity="0.3"/>
+      </svg>
+    </div>
+    <div class="corner-accent bl">
+      <svg viewBox="0 0 60 60" fill="none">
+        <path d="M4 56 L4 4 L56 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        <rect x="6" y="34" width="20" height="1" fill="var(--accent)" opacity="0.3"/>
+        <rect x="6" y="34" width="1" height="20" fill="var(--accent)" opacity="0.3"/>
+      </svg>
+    </div>
+    <div class="corner-accent br">
+      <svg viewBox="0 0 60 60" fill="none">
+        <path d="M4 56 L4 4 L56 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        <rect x="34" y="34" width="20" height="1" fill="var(--accent)" opacity="0.3"/>
+        <rect x="53" y="34" width="1" height="20" fill="var(--accent)" opacity="0.3"/>
+      </svg>
+    </div>
+
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+
+    <div class="content">
+      <div class="logo">
+        <img src="assets/lasu.png" alt="LASU Logo">
+      </div>
+
+      <div class="pre-title">Lagos State University &middot; <span>Computer Science</span></div>
+
+      <h1 class="title">Certificate<br><span class="accent">Generator</span></h1>
+
+      <div class="subtitle-line">CSC 226 &middot; Object-Oriented Programming I</div>
+
+      <div class="badge-row">
+        <span class="badge badge-accent">C++17</span>
+        <span class="badge badge-blue">Winsock2</span>
+        <span class="badge badge-green">Strategy</span>
+        <span class="badge badge-accent">Factory</span>
+        <span class="badge badge-blue">Template Method</span>
+        <span class="badge badge-green">Polymorphism</span>
+        <span class="badge badge-white">RAII</span>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="icon">&#9733;</div>
+          <h4>3 Certificate Types</h4>
+          <p>Excellence &middot; Completion &middot; Participation</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">&#9776;</div>
+          <h4>3 Template Styles</h4>
+          <p>Formal &middot; Modern &middot; Minimalist</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">&#9881;</div>
+          <h4>Custom HTTP Server</h4>
+          <p>12 REST Endpoints &middot; Thread-safe</p>
+        </div>
+      </div>
+
+      <div class="tech-bar">
+        <span class="tech-pill">C++17</span>
+        <span class="tech-pill">Winsock2</span>
+        <span class="tech-pill">HTML/CSS/JS</span>
+        <span class="tech-pill">std::map</span>
+        <span class="tech-pill">std::thread</span>
+        <span class="tech-pill">SPA</span>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <span>Group 6</span>
+      <span class="sep"></span>
+      <span>CSC 226</span>
+      <span class="sep"></span>
+      <span>July 2026</span>
+      <span class="sep"></span>
+      <span>localhost:8080</span>
+    </div>
+  </div>
+</body>
+</html>
